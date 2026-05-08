@@ -341,7 +341,7 @@ runs:
         # Obviously a risk of shell injection here, but given the entire point is for prompt injection
         # and the one passing it is the person setting up the action in the first place...
         echo "Generating opencode prompt"
-        [ -z "$UNINTERPRETED_PROMPT" ] UNINTERPRETED_PROMPT="$DEFAULT_UNINTERPRETED_PROMPT"
+        [ -z "$UNINTERPRETED_PROMPT" ] && UNINTERPRETED_PROMPT="$DEFAULT_UNINTERPRETED_PROMPT"
 
         echo "prompt<<FORGEJO_OUTPUT_FINAL_OUTPUT_TOKEN
         ${UNINTERPRETED_PROMPT@P}
