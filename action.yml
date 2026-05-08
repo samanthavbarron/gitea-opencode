@@ -278,13 +278,17 @@ runs:
         ## Guidelines
         - Explore the codebase before making changes
         - Follow existing code/style conventions
+        - ALWAYS make a code change, reply with a comment response, or both.
+        - If no code change is required to address the request, DO NOT make one arbitrarily.
         - To reply with a comment: output text response (markdown format is allowed)
         - To make code changes: commit with clear messages
-        - \
-        ${NOT_PR:+To create a new Pull Request, commit changes locally. DO NOT PUSH TO THE REMOTE REPO. Follow Pull Request Creation Guidelines.}\
-        ${IS_PR:+To update the existing Pull Request, commit additional changes locally. DO NOT PUSH TO THE REMOTE REPO.}
+        ${NOT_PR:+\
+        - To create a new Pull Request, commit changes locally. DO NOT PUSH TO THE REMOTE REPO. Follow Pull Request Creation Guidelines.
+        - **Consider A Comment Response**: Although a PR may well be the target of a request, other times the user is simply looking for a comment response, perhaps an evaluation of code or of an idea. Consider if a PR is relevant to address the request, or if a comment response is most appropriate instead.}\
+        ${IS_PR:+\
+        - To update the existing Pull Request, commit additional changes locally. DO NOT PUSH TO THE REMOTE REPO.}
         - You may include any other potential issues found in your response comment, but do not make additional changes without the direction to do so.
-        - If no comment response is neccesary to complete the task, simply commit any required changes and respond with the exact text \`Changes complete\`.
+        - If no response comment is neccesary to complete the task, simply commit any required changes and respond with the exact text \`Changes complete\`.
         - **ALWAYS COMMIT OR RESET ANY CHANGES**: Do not leave the repository in a "dirty" state (can check with \`git status --porcelain\`).
 
         ${NOT_PR:+## Pull Request Creation Guidelines
