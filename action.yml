@@ -337,27 +337,19 @@ runs:
         # END DEFAULT PROMPT
         # ------------------
 
-        echo "DEFAULT_UNINTERPRETED_PROMPT"
-        echo "$DEFAULT_UNINTERPRETED_PROMPT"
         # This uses subshell expansion to "inflate" the variables in the prompt (passed in or default)
         # Obviously a risk of shell injection here, but given the entire point is for prompt injection
         # and the one passing it is the person setting up the action in the first place...
         echo "Generating opencode prompt"
-        if [ -z "$USER_SPECIFIED_UNINTERPRETED_PROMPT" ]; then
-          INTERPRETED_PROMPT="${DEFAULT_UNINTERPRETED_PROMPT@P}"
-        else
-          INTERPRETED_PROMPT="${USER_SPECIFIED_UNINTERPRETED_PROMPT@P}"
-        fi
-        echo "INTERPRETED_PROMPT"
-        echo "$INTERPRETED_PROMPT"
+        [ -z "$UNINTERPRETED_PROMPT" ] UNINTERPRETED_PROMPT="$DEFAULT_UNINTERPRETED_PROMPT"
 
         echo "prompt<<FORGEJO_OUTPUT_FINAL_OUTPUT_TOKEN
-        $INTERPRETED_PROMPT
+        ${UNINTERPRETED_PROMPT@P}
         FORGEJO_OUTPUT_FINAL_OUTPUT_TOKEN" >> $FORGEJO_OUTPUT
         echo "::endgroup::"
       env:
         MENTIONS: ${{ inputs.mentions }}
-        USER_SPECIFIED_UNINTERPRETED_PROMPT: ${{ inputs.prompt }}
+        UNINTERPRETED_PROMPT: ${{ inputs.prompt }}
 
     - name: Run opencode
       shell: bash
