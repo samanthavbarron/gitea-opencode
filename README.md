@@ -68,10 +68,8 @@ jobs:
         startsWith(forgejo.event.review.content, '/opencode')
       )
 
-    # The actions/checkout@v4 action may have requirements, but this
-    # does not require node or other languages be present. It only
-    # requires a semi-recent git, curl, bash and ability to run the
-    # latest opencode and jq versions (both of which it retrieves)
+    # This action runner only requires bash 4.4+, git, curl, bash and the
+    # ability to run latest opencode and jq (both of which it retrieves)
     runs-on: ubuntu-latest
 
     steps:
@@ -102,7 +100,7 @@ jobs:
           OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
 ```
 
-Another example, if you wanted to simply have opencode respond to any/all issues opened in a given repository, without any kind of trigger word(s):
+Another example, if you wanted to simply have opencode respond to any/all issues opened in a given repository, without any kind of trigger word(s). This one uses a custom prompt as well.
 
 ```yaml
 name: opencode
@@ -121,8 +119,86 @@ jobs:
           model: opencode-go/kimi-k2.6
           pr-creation-pat: ${{ secrets.PR_CREATION_PAT }}
           agent: build
-          variant: ""
-          mentions: ""
+          prompt: |
+            You are an AI assistant that helps develop and improve code repositories. The git repository in question is in the current directory.
+
+            ## Task
+            Evaluate and either resolve or respond with a comment to the issue described below, using the available tools.
+            Evaluate the Issue and any attached information to fully understand the task.
+            Be thorough in your analysis and provide clear explanations.
+            
+            ## Context
+            Issue Title:
+            $ISSUE_TITLE
+            
+            Issue Body:
+            $TRIGGERING_REQUEST_BODY
+    
+            ## Guidelines
+            - Explore the codebase before making changes
+            - Follow existing code/style conventions
+            - To reply with a comment: output text response (markdown format is allowed)
+            - To make code changes: commit with clear messages
+            - To create a new Pull Request, commit changes locally. DO NOT PUSH TO THE REMOTE REPO. Follow Pull Request Creation Guidelines.
+            - If no response comment is neccesary to complete the task, simply commit any required changes and respond with the exact text \`Changes complete\`.
+            - **ALWAYS COMMIT OR RESET ANY CHANGES**: Do not leave the repository in a "dirty" state (can check with \`git status --porcelain\`).
+            - **First Commit Creates the PR**: The first commit summary (first line) and body text (subsequent lines) made will be used to define the title and description of the new pull request, respectively.
+            - **Description is Markdown**: The Pull Request description (subsequent lines in the commit) is interpreted in markdown format.
+            - **DO NOT follow commit message standards**: Since the first commit message is used to create the Pull Request itself, you ABSOLUTELY SHOULD NOT follow existing or standard commit message guidelines. The PR commit message will be squashed when merged by the user in any case.
+            - **Detailed Pull Request Descriptions**: Details regarding justification, investigation, changes, decisions made, and other information about changes should be included as part of the Pull Request description, rather than on a seperate comment.
+            - **Auto-Closing Original Issues**: Auto-closing the original issue on merge of a PR can be triggerd by including \`fixes #123\` or \`closes #345\` somewhere within the PR description.
+            - **An Issue Link is Already Created**: A separate comment will already be added to the issue, notifying users of the PR creation and linking to it directly. When a Pull Request is created, only respond with a comment if the response is unrelated to the changes made.
+            - **DO NOT switch branches**: The current branch has already been created to hold your changes in case a PR is needed.
+            - **DO NOT Submit For A PR**: A Pull Request will automatically be created after you have finished if there are any local commits, do not attempt to create one yourself.
         env:
           OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
+```
+
+A final simple example specifying a custom opencode configuration file, allowing the user to use a self hosted model via llama.cpp (llama-server).
+
+```yaml
+name: opencode
+
+on:
+  issues:
+    types: [opened]
+  issue_comment:
+    types: [created]
+  pull_request_review_comment:
+    types: [created]
+  pull_request_review:
+    types: [submitted]
+
+jobs:
+  opencode:
+    if: |
+      (forgejo.event_name == 'issues' && contains(forgejo.event.issue.body, '/opencode')) ||
+      contains(forgejo.event.comment.body, '/opencode') ||
+      contains(forgejo.event.review.content, '/opencode')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run opencode
+        uses: https://codeberg.org/dragonfyre13/forgejo-opencode@latest
+        with:
+          pr-creation-pat: ${{ secrets.PR_CREATION_PAT }}
+          config: |
+            {
+              "$schema": "https://opencode.ai/config.json",
+              "provider": {
+                "local-llm": {
+                  "npm": "@ai-sdk/openai-compatible",
+                  "name": "llama-server (local)",
+                  "options": {"baseURL": "http://llm:8080/v1"},
+                  "models": {
+                    "qwen3.6-27B": {
+                      "name": "Qwen3.6: 27B (local)",
+                      "limit": {"context": 262144, "output": 65536}
+                    }
+                  }
+                }
+              }
+            }
+          model: local-llm/qwen3.6-27B
+          agent: build
+          mentions: /opencode
 ```
