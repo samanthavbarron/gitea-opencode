@@ -340,11 +340,13 @@ runs:
         # Obviously a risk of shell injection here, but given the entire point is for prompt injection
         # and the one passing it is the person setting up the action in the first place...
         echo "Generating opencode prompt"
+        if [ -z "$USER_SPECIFIED_UNINTERPRETED_PROMPT" ]; then
+          INTERPRETED_OUTPUT="${DEFAULT_UNINTERPRETED_PROMPT@P}"
+        else
+          INTERPRETED_OUTPUT="${DEFAULT_UNINTERPRETED_PROMPT@P}"
+        fi
         echo "prompt<<FORGEJO_OUTPUT_FINAL_OUTPUT_TOKEN
-        $(cat <<EOF
-        ${USER_SPECIFIED_UNINTERPRETED_PROMPT:-$DEFAULT_UNINTERPRETED_PROMPT}
-        EOF
-        )
+        $INTERPRETED_OUTPUT
         FORGEJO_OUTPUT_FINAL_OUTPUT_TOKEN
         " >> $FORGEJO_OUTPUT
         echo "::endgroup::"
