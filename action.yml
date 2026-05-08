@@ -10,15 +10,27 @@ inputs:
     required: true
 
   agent:
-    description: "Agent to use. Must be a primary agent. Falls back to default_agent from config or 'build' if not found."
+    description: "Agent to use. Must be a primary agent."
     required: false
 
   mentions:
-    description: "Comma-separated list of trigger phrases (case-insensitive). Defaults to '/opencode,/oc'"
+    description: "Comma-separated list of trigger phrases (case-insensitive)."
     required: false
 
   variant:
     description: "Model variant for provider-specific reasoning effort (e.g., high, max, minimal)"
+    required: false
+
+  config:
+    description: "Stored as ~/.config/opencode/opencode.jsonc before invoking opencode"
+    required: false
+
+  prompt:
+    description: |
+      Intended for advanced users only. This replaces the default prompt sent to opencode, interpreting it first as a string by bash (including variable expansion). Available bash environment variables (may) include:
+      USERNAME, ISSUE_TITLE, ISSUE_NUMBER, TRIGGERING_REQUEST_BODY, ISSUE_DETAILS_JSON, ISSUE_COMMENTS_JSON, PR_REVIEWS_JSON, PR_REVIEW_COMMENTS_JSON, IS_PR, NOT_PR.
+      If the event is not related to an existing PR, the following are unset: PR_REVIEWS_JSON, PR_REVIEW_COMMENTS_JSON, IS_PR. If it is related to an existing PR, only the "NOT_PR" variable is unset.
+      See "Build opencode prompt" step in the forgejo-opencode action codebase for the default prompt as an example.
     required: false
 
   pr-creation-pat:
@@ -90,27 +102,36 @@ runs:
         header = \"Accept: application/json\"
         header = \"Content-Type: application/json\"" >> ~/.curlrc
 
-    - name: Debug Output
+    #- name: Debug Output
+    #  shell: bash
+    #  run: |
+    #    echo "::group::Event Debugging Output"
+    #    echo "--------------"
+    #    echo "Env Variables:"
+    #    echo "--------------"
+    #    env
+    #    echo "---------------"
+    #    echo "Forgejo Object:"
+    #    echo "---------------"
+    #    cat <<'EOF'
+    #    ${{ toJSON(forgejo) }}
+    #    EOF
+    #    echo "--------------"
+    #    echo "Event Details:"
+    #    echo "--------------"
+    #    cat $FORGEJO_EVENT_PATH
+    #    echo ""
+    #    echo "::endgroup::"
+
+    - name: Add opencode config
+      if: inputs.config != ''
+      env:
+        CONFIG: ${{ inputs.config }}
       shell: bash
       run: |
-        echo "::group::Event Debugging Output"
-        echo "--------------"
-        echo "Env Variables:"
-        echo "--------------"
-        env
-        echo "---------------"
-        echo "Forgejo Object:"
-        echo "---------------"
-        cat <<'EOF'
-        ${{ toJSON(forgejo) }}
-        EOF
-        echo "--------------"
-        echo "Event Details:"
-        echo "--------------"
-        cat $FORGEJO_EVENT_PATH
-        echo ""
-        echo "::endgroup::"
-    
+        mkdir -p ~/.config/opencode
+        echo "$CONFIG" > ~/.config/opencode
+
     - name: Get Details
       id: get_details
       shell: bash
@@ -234,6 +255,11 @@ runs:
         USERNAME="$(jq -r '.username' "$RUNNER_TEMP/sender_details.json")"
         ISSUE_TITLE="$(jq -r '.title' "$RUNNER_TEMP/issue_details.json")"
         ISSUE_NUMBER="$(jq -r '.number' "$RUNNER_TEMP/issue_details.json")"
+        TRIGGERING_REQUEST_BODY="$(cat "$RUNNER_TEMP/triggering_request_body")"
+        [ -f "$RUNNER_TEMP/issue_details.json" ] && ISSUE_DETAILS_JSON="$(jq -c '.' "$RUNNER_TEMP/issue_details.json")"
+        [ -f "$RUNNER_TEMP/issue_comments.json" ] && ISSUE_COMMENTS_JSON="$(jq -c '.' "$RUNNER_TEMP/issue_comments.json")"
+        [ -f "$RUNNER_TEMP/pr_reviews.json" ] && PR_REVIEWS_JSON="$(jq -c '.' "$RUNNER_TEMP/pr_reviews.json")"
+        [ -f "$RUNNER_TEMP/pr_review_comments.json" ] && PR_REVIEW_COMMENTS_JSON="$(jq -c '.' "$RUNNER_TEMP/pr_review_comments.json")"
 
         if [ "$FORGEJO_EVENT_NAME" == "pull_request_review_comment" ]; then
           LATEST_PR_REVIEW_ID="$(jq -c 'first(.[] | select(.stale == false)).id' "$RUNNER_TEMP/pr_reviews.json")"
@@ -251,29 +277,33 @@ runs:
 
         [ -f "$RUNNER_TEMP/pr_details.json" ] && IS_PR='true' || NOT_PR='true'
 
-        echo "Generating opencode prompt"
-        cat >> $FORGEJO_OUTPUT <<FORGEJO_OUTPUT_EOF_TOKEN
-        prompt<<FORGEJO_OUTPUT_FINAL_OUTPUT_TOKEN
+        # --------------------
+        # START DEFAULT PROMPT
+        # --------------------
+
+        # This IS supposed to be non-interpreted at this point (single quotes).
+        # It DOES get interpreted later (a few lines down), if no user specified prompt is provided.
+        DEFAULT_UNINTERPRETED_PROMPT=$(cat <<'FORGEJO_OUTPUT_EOF_TOKEN'
         You are an AI assistant that helps develop and improve code repositories. The git repository in question is in the current directory.
 
         ## Task
         $TASK_MESSAGE
-        $(cat "$RUNNER_TEMP/triggering_request_body")
+        $TRIGGERING_REQUEST_BODY
 
         Please execute the requested task using the available tools.
         Evaluate the ${IS_PR:-Issue}${IS_PR:+Pull Request} and any attached information to fully understand the task.
         Be thorough in your analysis and provide clear explanations.
 
         ${NOT_PR:+## Context
-        * **Issue Title**: $ISSUE_TITLE
-        * **Issue Details**: $([ -f "$RUNNER_TEMP/issue_details.json" ] && jq -c '.' "$RUNNER_TEMP/issue_details.json")
-        * **All Issue Comments**: $([ -f "$RUNNER_TEMP/issue_comments.json" ] && jq -c '.' "$RUNNER_TEMP/issue_comments.json")}\
+        ${ISSUE_TITLE:+* **Issue Title**: $ISSUE_TITLE}
+        ${ISSUE_DETAILS_JSON:+* **Issue Details**: $ISSUE_DETAILS_JSON}
+        ${ISSUE_COMMENTS_JSON:+* **All Issue Comments**: $ISSUE_COMMENTS_JSON}}\
         ${IS_PR:+## Context
-        * **Pull Request Title**: $ISSUE_TITLE
-        * **Pull Request Details**: $([ -f "$RUNNER_TEMP/issue_details.json" ] && jq -c '.' "$RUNNER_TEMP/issue_details.json")
-        * **Pull Request Comments**: $([ -f "$RUNNER_TEMP/issue_comments.json" ] && jq -c '.' "$RUNNER_TEMP/issue_comments.json")
-        * **All Pull Request Reviews**: $([ -f "$RUNNER_TEMP/pr_reviews.json" ] && jq -c '.' "$RUNNER_TEMP/pr_reviews.json")
-        * **All Pull Request Review Comments**: $([ -f "$RUNNER_TEMP/pr_review_comments.json" ] && jq -c '.' "$RUNNER_TEMP/pr_review_comments.json")}
+        ${ISSUE_TITLE:+* **Pull Request Title**: $ISSUE_TITLE}
+        ${ISSUE_DETAILS_JSON:+* **Pull Request Details**: $ISSUE_DETAILS_JSON}
+        ${ISSUE_COMMENTS_JSON:+* **Pull Request Comments**: $ISSUE_COMMENTS_JSON}
+        ${PR_REVIEWS_JSON:+* **All Pull Request Reviews**: $PR_REVIEWS_JSON}
+        ${PR_REVIEW_COMMENTS_JSON:+* **All Pull Request Review Comments**: $PR_REVIEW_COMMENTS_JSON}}
 
         ## Guidelines
         - Explore the codebase before making changes
@@ -300,24 +330,41 @@ runs:
         * **An Issue Link is Already Created**: A separate comment will already be added to the issue, notifying users of the PR creation and linking to it directly. When a Pull Request is created, only respond with a comment if the response is unrelated to the changes made.
         * **DO NOT switch branches**: The current branch has already been created to hold your changes in case a PR is needed.
         * **DO NOT Submit For A PR**: A Pull Request will automatically be created after you have finished if there are any local commits, do not attempt to create one yourself.}
-        FORGEJO_OUTPUT_FINAL_OUTPUT_TOKEN
         FORGEJO_OUTPUT_EOF_TOKEN
+
+        # ------------------
+        # END DEFAULT PROMPT
+        # ------------------
+
+        # This uses subshell expansion to "inflate" the variables in the prompt (passed in or default)
+        # Obviously a risk of shell injection here, but given the entire point is for prompt injection
+        # and the one passing it is the person setting up the action in the first place...
+        echo "Generating opencode prompt"
+        echo "prompt<<FORGEJO_OUTPUT_FINAL_OUTPUT_TOKEN
+        $(cat <<EOF
+        ${USER_SPECIFIED_UNINTERPRETED_PROMPT:-$DEFAULT_UNINTERPRETED_PROMPT}
+        EOF
+        )
+        FORGEJO_OUTPUT_FINAL_OUTPUT_TOKEN
+        " >> $FORGEJO_OUTPUT
         echo "::endgroup::"
       env:
         MENTIONS: ${{ inputs.mentions }}
+        USER_SPECIFIED_UNINTERPRETED_PROMPT: ${{ inputs.prompt }}
 
     - name: Run opencode
       shell: bash
       id: run_opencode
       run: |
-        echo "Running with command:"
+        echo "::group::Opencode Command:"
         echo "$OPENCODE_COMMAND"
+        echo "::endgroup::"
 
         echo "-----------------------"
         echo "-- Starting opencode --"
         echo "-----------------------"
         echo "opencode_final_output<<'FORGEJO_OUTPUT_FINAL_OUTPUT_TOKEN'" >> $FORGEJO_OUTPUT
-        opencode run --model "$MODEL" --agent "${AGENT:-build}" --variant "${VARIANT:-high}" "$OPENCODE_COMMAND" >> $FORGEJO_OUTPUT
+        opencode run --model "$MODEL" ${AGENT:+--agent "$AGENT"} ${VARIANT:+--variant "$VARIANT"} "$OPENCODE_COMMAND" >> $FORGEJO_OUTPUT
         echo "'FORGEJO_OUTPUT_FINAL_OUTPUT_TOKEN'" >> $FORGEJO_OUTPUT
         echo "-----------------------"
         echo "-- Finished opencode --"
@@ -326,7 +373,7 @@ runs:
         if [ -n "$(git status --porcelain)" ]; then
           echo "::group::Yelling at the model for leaving the git repo dirty"
           echo "Berating the model for not committing changes as it was told to do."
-          opencode run --model "$MODEL" --agent "${AGENT:-build}" --variant "${VARIANT:-high}" --continue "You have utterly failed at committing some of your changes to git. Either commit your changes or perform a git reset to clean up the repository. Any text respose made to this request will be ignored."
+          opencode run --model "$MODEL" ${AGENT:+--agent "$AGENT"} ${VARIANT:+--variant "$VARIANT"} --continue "You have utterly failed at committing some of your changes to git. Either commit your changes or perform a git reset to clean up the repository. Any text respose made to this request will be ignored."
           echo "::endgroup::"
         fi
       env:
