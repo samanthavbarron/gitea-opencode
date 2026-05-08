@@ -130,7 +130,7 @@ runs:
       shell: bash
       run: |
         mkdir -p ~/.config/opencode
-        echo "$CONFIG" > ~/.config/opencode
+        echo "$CONFIG" > ~/.config/opencode/opencode.jsonc
 
     - name: Get Details
       id: get_details
