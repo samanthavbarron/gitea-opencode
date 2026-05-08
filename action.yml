@@ -283,7 +283,7 @@ runs:
 
         # This IS supposed to be non-interpreted at this point (single quotes).
         # It DOES get interpreted later (a few lines down), if no user specified prompt is provided.
-        DEFAULT_UNINTERPRETED_PROMPT=$(cat <<'FORGEJO_OUTPUT_EOF_TOKEN'
+        DEFAULT_UNINTERPRETED_PROMPT="$(cat <<'FORGEJO_OUTPUT_EOF_TOKEN'
         You are an AI assistant that helps develop and improve code repositories. The git repository in question is in the current directory.
 
         ## Task
@@ -331,6 +331,7 @@ runs:
         * **DO NOT switch branches**: The current branch has already been created to hold your changes in case a PR is needed.
         * **DO NOT Submit For A PR**: A Pull Request will automatically be created after you have finished if there are any local commits, do not attempt to create one yourself.}
         FORGEJO_OUTPUT_EOF_TOKEN
+        )"
 
         # ------------------
         # END DEFAULT PROMPT
