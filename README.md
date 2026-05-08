@@ -50,23 +50,20 @@ jobs:
     # the agent, but this only affects the prompt details sent as input
     # to the opencode process directly.
     if: |
-      (
-        forgejo.event_name == 'issues' && (
-          contains(forgejo.event.issue.body, ' /oc') ||
-          startsWith(forgejo.event.issue.body, '/oc') ||
-          contains(forgejo.event.issue.body, ' /opencode') ||
-          startsWith(forgejo.event.issue.body, '/opencode')
-        )
-      ) || (
-        contains(forgejo.event.comment.body, ' /oc') ||
-        startsWith(forgejo.event.comment.body, '/oc') ||
-        contains(forgejo.event.comment.body, ' /opencode') ||
-        startsWith(forgejo.event.comment.body, '/opencode') ||
-        contains(forgejo.event.review.content, ' /oc') ||
-        startsWith(forgejo.event.review.content, '/oc') ||
-        contains(forgejo.event.review.content, ' /opencode') ||
-        startsWith(forgejo.event.review.content, '/opencode')
-      )
+      (forgejo.event_name == 'issues' && (
+        contains(forgejo.event.issue.body, ' /oc') ||
+        startsWith(forgejo.event.issue.body, '/oc') ||
+        contains(forgejo.event.issue.body, ' /opencode') ||
+        startsWith(forgejo.event.issue.body, '/opencode')
+      )) ||
+      contains(forgejo.event.comment.body, ' /oc') ||
+      startsWith(forgejo.event.comment.body, '/oc') ||
+      contains(forgejo.event.comment.body, ' /opencode') ||
+      startsWith(forgejo.event.comment.body, '/opencode') ||
+      contains(forgejo.event.review.content, ' /oc') ||
+      startsWith(forgejo.event.review.content, '/oc') ||
+      contains(forgejo.event.review.content, ' /opencode') ||
+      startsWith(forgejo.event.review.content, '/opencode')
 
     # This action runner only requires bash 4.4+, git, curl, bash and the
     # ability to run latest opencode and jq (both of which it retrieves)
@@ -78,7 +75,7 @@ jobs:
         with:
           # This is passed as --model to opencode when called
           model: opencode-go/kimi-k2.6
-          
+
           # Used solely for creating PRs, all other operations use the
           # provided emphemeral action token
           pr-creation-pat: ${{ secrets.PR_CREATION_PAT }}
@@ -126,14 +123,14 @@ jobs:
             Evaluate and either resolve or respond with a comment to the issue described below, using the available tools.
             Evaluate the Issue and any attached information to fully understand the task.
             Be thorough in your analysis and provide clear explanations.
-            
+
             ## Context
             Issue Title:
             $ISSUE_TITLE
-            
+
             Issue Body:
             $TRIGGERING_REQUEST_BODY
-    
+
             ## Guidelines
             - Explore the codebase before making changes
             - Follow existing code/style conventions
