@@ -16,9 +16,9 @@ The type of responses supported include one or more of the following:
 * Adding a comment response to the issue or PR in question
 
 ## Requiring the `PR_CREATION_PAT` secret
-Unfortunately forgejo does not provide a token to actions capable of creating a new PR, only capable of actions like responding to an issue with a new comment. This means in order to seamlessly creeate a PR for a changes made in a new branch, this action must be provided with a Personal Access Token (PAT) capable of opening a new PR within the repostitory (requires SOLELY the `repository read+write` permission on the repoisitory in question). This is optional, but highly recommended. The ephemeral token provided by forgejo automatically is used for ALL other actions, whether or not this `PR_CREATION_PAT` is provided.
+Unfortunately Gitea does not provide a token to actions capable of creating a new PR, only capable of actions like responding to an issue with a new comment. This means in order to seamlessly creeate a PR for a changes made in a new branch, this action must be provided with a Personal Access Token (PAT) capable of opening a new PR within the repostitory (requires SOLELY the `repository read+write` permission on the repoisitory in question). This is optional, but highly recommended. The ephemeral token provided by Gitea automatically is used for ALL other actions, whether or not this `PR_CREATION_PAT` is provided.
 
-Although Forgejo does not yet fully support "bot" accounts (service accounts), it's recommended to create a new user (e.g. "opencode-bot") and produce the `PR_CREATION_PAT` under this user, giving it the `repository read+write` permission to all repositories that it's been added as a collaborator to. This separate user can then be added as a collaborator to any projects that use this action, allowing them to create the PR as required.
+Although Gitea does not yet fully support "bot" accounts (service accounts), it's recommended to create a new user (e.g. "opencode-bot") and produce the `PR_CREATION_PAT` under this user, giving it the `repository read+write` permission to all repositories that it's been added as a collaborator to. This separate user can then be added as a collaborator to any projects that use this action, allowing them to create the PR as required.
 
 ## Protections against random code changes
 This prepares an environment for the agent by pre-checking out the relevant codebase, checking out the appropriate branch if it's a PR related event, or creating a new local branch for commits made by opencode if the event is yet unrelated to a specific PR. While the opencode runner is given effectively free reign by design while executing, it is NOT provided access keys or an authenticated git environment to allow it to push back to other branches (or to `origin/main`). All work unrelated to an existing PR is done on a new branch created for this purpose, and work related to an existing PR is done on the branch associated with the PR in question. This is the only branch pushed back to the repository in question.
@@ -27,7 +27,7 @@ This prepares an environment for the agent by pre-checking out the relevant code
 The Author of any commits made is set to whichever user triggered the event in the first place, such as the person who made a comment on the issue which triggered PR creation to occur. All commits performed are attributed with the git trailer `Co-authored-by: opencode <opencode@noreply.localhost>`, and set with the committer name as `opencode` and committer email as `opencode@noreply.localhost`.
 
 # Usage
-Usage should look something like the below, just create it as a file in `.forgejo/workflows/opencode.yaml` within a repository. The `PR_CREATION_PAT` secret is optional, but highly recommended. Without it, the action only creates branches vs PRs on any changes.
+Usage should look something like the below, just create it as a file in `.gitea/workflows/opencode.yaml` within a repository. The `PR_CREATION_PAT` secret is optional, but highly recommended. Without it, the action only creates branches vs PRs on any changes.
 
 ```yaml
 name: opencode
@@ -52,20 +52,20 @@ jobs:
     # the agent, but this only affects the prompt details sent as input
     # to the opencode process directly.
     if: |
-      (forgejo.event_name == 'issues' && (
-        contains(forgejo.event.issue.body, ' /oc') ||
-        startsWith(forgejo.event.issue.body, '/oc') ||
-        contains(forgejo.event.issue.body, ' /opencode') ||
-        startsWith(forgejo.event.issue.body, '/opencode')
+      (github.event_name == 'issues' && (
+        contains(github.event.issue.body, ' /oc') ||
+        startsWith(github.event.issue.body, '/oc') ||
+        contains(github.event.issue.body, ' /opencode') ||
+        startsWith(github.event.issue.body, '/opencode')
       )) ||
-      contains(forgejo.event.comment.body, ' /oc') ||
-      startsWith(forgejo.event.comment.body, '/oc') ||
-      contains(forgejo.event.comment.body, ' /opencode') ||
-      startsWith(forgejo.event.comment.body, '/opencode') ||
-      contains(forgejo.event.review.content, ' /oc') ||
-      startsWith(forgejo.event.review.content, '/oc') ||
-      contains(forgejo.event.review.content, ' /opencode') ||
-      startsWith(forgejo.event.review.content, '/opencode')
+      contains(github.event.comment.body, ' /oc') ||
+      startsWith(github.event.comment.body, '/oc') ||
+      contains(github.event.comment.body, ' /opencode') ||
+      startsWith(github.event.comment.body, '/opencode') ||
+      contains(github.event.review.content, ' /oc') ||
+      startsWith(github.event.review.content, '/oc') ||
+      contains(github.event.review.content, ' /opencode') ||
+      startsWith(github.event.review.content, '/opencode')
 
     # This action runner only requires bash 4.4+, git, curl, bash and the
     # ability to run latest opencode and jq (both of which it retrieves)
@@ -73,7 +73,7 @@ jobs:
 
     steps:
       - name: Run opencode
-        uses: https://codeberg.org/dragonfyre13/forgejo-opencode@latest
+        uses: samanthavbarron/gitea-opencode@main
         with:
           # This is passed as --model to opencode when called
           model: opencode-go/kimi-k2.6
@@ -113,7 +113,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Run opencode
-        uses: https://codeberg.org/dragonfyre13/forgejo-opencode@latest
+        uses: samanthavbarron/gitea-opencode@main
         with:
           model: opencode-go/kimi-k2.6
           pr-creation-pat: ${{ secrets.PR_CREATION_PAT }}
@@ -171,13 +171,13 @@ on:
 jobs:
   opencode:
     if: |
-      (forgejo.event_name == 'issues' && contains(forgejo.event.issue.body, '/opencode')) ||
-      contains(forgejo.event.comment.body, '/opencode') ||
-      contains(forgejo.event.review.content, '/opencode')
+      (github.event_name == 'issues' && contains(github.event.issue.body, '/opencode')) ||
+      contains(github.event.comment.body, '/opencode') ||
+      contains(github.event.review.content, '/opencode')
     runs-on: ubuntu-latest
     steps:
       - name: Run opencode
-        uses: https://codeberg.org/dragonfyre13/forgejo-opencode@latest
+        uses: samanthavbarron/gitea-opencode@main
         with:
           pr-creation-pat: ${{ secrets.PR_CREATION_PAT }}
           config: |

@@ -1,5 +1,5 @@
-name: "opencode Forgejo Action"
-description: "Run opencode in Forgejo Actions workflows"
+name: "opencode Gitea Action"
+description: "Run opencode in Gitea Actions workflows"
 branding:
   icon: "code"
   color: "orange"
@@ -30,7 +30,7 @@ inputs:
       Intended for advanced users only. This replaces the default prompt sent to opencode, interpreting it first as a string by bash (including variable expansion). Available bash environment variables (may) include:
       USERNAME, ISSUE_TITLE, ISSUE_NUMBER, TRIGGERING_REQUEST_BODY, ISSUE_DETAILS_JSON, ISSUE_COMMENTS_JSON, PR_REVIEWS_JSON, PR_REVIEW_COMMENTS_JSON, IS_PR, NOT_PR.
       If the event is not related to an existing PR, the following are unset: PR_REVIEWS_JSON, PR_REVIEW_COMMENTS_JSON, IS_PR. If it is related to an existing PR, only the "NOT_PR" variable is unset.
-      See "Build opencode prompt" step in the forgejo-opencode action codebase for the default prompt as an example.
+      See "Build opencode prompt" step in the gitea-opencode action codebase for the default prompt as an example.
     required: false
 
   pr-creation-pat:
@@ -51,7 +51,7 @@ runs:
       shell: bash
       run: |
         VERSION=$(curl -sf https://api.github.com/repos/anomalyco/opencode/releases/latest | grep -o '"tag_name": *"[^"]*"' | cut -d'"' -f4)
-        echo "version=${VERSION:-latest}" >> $FORGEJO_OUTPUT
+        echo "version=${VERSION:-latest}" >> $GITHUB_OUTPUT
 
     - name: Cache opencode
       id: cache_opencode
@@ -70,7 +70,7 @@ runs:
       shell: bash
       run: |
         VERSION=$(curl -fsSL https://api.github.com/repos/jqlang/jq/releases/latest | grep -o '"tag_name": *"[^"]*"' | cut -d'"' -f4)
-        echo "version=${VERSION:-latest}" >> $FORGEJO_OUTPUT
+        echo "version=${VERSION:-latest}" >> $GITHUB_OUTPUT
 
     - name: Cache jq
       id: cache_jq
@@ -89,7 +89,7 @@ runs:
 
     - name: Add opencode and jq to PATH
       shell: bash
-      run: echo -e "$HOME/.opencode/bin\n$HOME/.jq/bin" >> $FORGEJO_PATH
+      run: echo -e "$HOME/.opencode/bin\n$HOME/.jq/bin" >> $GITHUB_PATH
 
     - name: Set default curl options
       shell: bash
@@ -98,7 +98,7 @@ runs:
         silent
         show-error
         location
-        header = \"Authorization: Bearer $FORGEJO_TOKEN\"
+        header = \"Authorization: Bearer $GITHUB_TOKEN\"
         header = \"Accept: application/json\"
         header = \"Content-Type: application/json\"" >> ~/.curlrc
 
@@ -111,15 +111,15 @@ runs:
     #    echo "--------------"
     #    env
     #    echo "---------------"
-    #    echo "Forgejo Object:"
+    #    echo "Gitea Object:"
     #    echo "---------------"
     #    cat <<'EOF'
-    #    ${{ toJSON(forgejo) }}
+    #    ${{ toJSON(github) }}
     #    EOF
     #    echo "--------------"
     #    echo "Event Details:"
     #    echo "--------------"
-    #    cat $FORGEJO_EVENT_PATH
+    #    cat $GITHUB_EVENT_PATH
     #    echo ""
     #    echo "::endgroup::"
 
@@ -139,46 +139,46 @@ runs:
         echo "::group::Get Details"
 
         # Get basic info and find out what type of request this is
-        REPO_API_URL="$FORGEJO_API_URL/repos/$FORGEJO_REPOSITORY"
+        REPO_API_URL="$GITHUB_API_URL/repos/$GITHUB_REPOSITORY"
         BRANCH_NAME="opencode-$EPOCHREALTIME"
-        echo "$(jq -c '.sender' $FORGEJO_EVENT_PATH)" > $RUNNER_TEMP/sender_details.json
-        echo "$(jq -c '.repository' $FORGEJO_EVENT_PATH)" > $RUNNER_TEMP/repo_details.json
-        if [ "$FORGEJO_EVENT_NAME" == "issue_comment" ]; then
-          ISSUE_ID="$(jq -r '.issue.number' $FORGEJO_EVENT_PATH)"
-          [ "$(jq -r '.is_pull' $FORGEJO_EVENT_PATH)" == "true" ] && ISSUE_TYPE="Pull Request" || ISSUE_TYPE="Issue"
-          jq -r '.comment.body' $FORGEJO_EVENT_PATH > $RUNNER_TEMP/triggering_request_body
-        elif [ "$FORGEJO_EVENT_NAME" == "pull_request_review_comment" ]; then
-          ISSUE_ID="$(jq -r '.number' $FORGEJO_EVENT_PATH)"
+        echo "$(jq -c '.sender' $GITHUB_EVENT_PATH)" > $RUNNER_TEMP/sender_details.json
+        echo "$(jq -c '.repository' $GITHUB_EVENT_PATH)" > $RUNNER_TEMP/repo_details.json
+        if [ "$GITHUB_EVENT_NAME" == "issue_comment" ]; then
+          ISSUE_ID="$(jq -r '.issue.number' $GITHUB_EVENT_PATH)"
+          [ "$(jq -r '.is_pull' $GITHUB_EVENT_PATH)" == "true" ] && ISSUE_TYPE="Pull Request" || ISSUE_TYPE="Issue"
+          jq -r '.comment.body' $GITHUB_EVENT_PATH > $RUNNER_TEMP/triggering_request_body
+        elif [ "$GITHUB_EVENT_NAME" == "pull_request_review_comment" ]; then
+          ISSUE_ID="$(jq -r '.number' $GITHUB_EVENT_PATH)"
           ISSUE_TYPE="Pull Request"
-          jq -r '.review.content' $FORGEJO_EVENT_PATH > $RUNNER_TEMP/triggering_request_body
-        elif [ "$FORGEJO_EVENT_NAME" == "issues" ]; then
-          ISSUE_ID="$(jq -r '.number' $FORGEJO_EVENT_PATH)"
+          jq -r '.review.content' $GITHUB_EVENT_PATH > $RUNNER_TEMP/triggering_request_body
+        elif [ "$GITHUB_EVENT_NAME" == "issues" ]; then
+          ISSUE_ID="$(jq -r '.number' $GITHUB_EVENT_PATH)"
           ISSUE_TYPE="Issue"
-          jq -r '.issue.body' $FORGEJO_EVENT_PATH > $RUNNER_TEMP/triggering_request_body
+          jq -r '.issue.body' $GITHUB_EVENT_PATH > $RUNNER_TEMP/triggering_request_body
         else
           echo "::endgroup::"
-          echo "!!!!!!! Unknown event name: $FORGEJO_EVENT_NAME !!!!!!!"
+          echo "!!!!!!! Unknown event name: $GITHUB_EVENT_NAME !!!!!!!"
           exit 1
         fi
 
         # Get Issue related info
-        ISSUE_API_URL="$FORGEJO_API_URL/repos/$FORGEJO_REPOSITORY/issues/$ISSUE_ID"
-        if [ "$(jq -rc '.issue' $FORGEJO_EVENT_PATH)" == "null" ]; then
+        ISSUE_API_URL="$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/issues/$ISSUE_ID"
+        if [ "$(jq -rc '.issue' $GITHUB_EVENT_PATH)" == "null" ]; then
           echo "Hitting the API to get Issue Details"
           curl "$ISSUE_API_URL" | jq -c '{number: .number, title: .title, body: .body, assets: .assets, comment_count: .comments, username: .user.username}' > $RUNNER_TEMP/issue_details.json
         else
-          jq -c '{number: .issue.number, title: .issue.title, body: .issue.body, assets: .issue.assets, comment_count: .issue.comments, username: .issue.user.username}' $FORGEJO_EVENT_PATH > $RUNNER_TEMP/issue_details.json
+          jq -c '{number: .issue.number, title: .issue.title, body: .issue.body, assets: .issue.assets, comment_count: .issue.comments, username: .issue.user.username}' $GITHUB_EVENT_PATH > $RUNNER_TEMP/issue_details.json
         fi
         echo "Hitting the API to get Issue Comments"
         curl "$ISSUE_API_URL/comments" | jq -c 'map({id, body, assets, username: .user.username})' > $RUNNER_TEMP/issue_comments.json
 
         # Get PR related info
         if [ "$ISSUE_TYPE" == "Pull Request" ]; then
-          if [ "$(jq -rc '.pull_request' $FORGEJO_EVENT_PATH)" == "null" ]; then
+          if [ "$(jq -rc '.pull_request' $GITHUB_EVENT_PATH)" == "null" ]; then
             echo "Hitting the API to get PR Details"
             curl "$REPO_API_URL/pulls/$ISSUE_ID" > $RUNNER_TEMP/pr_details.json
           else
-            jq -c '.pull_request' $FORGEJO_EVENT_PATH > $RUNNER_TEMP/pr_details.json
+            jq -c '.pull_request' $GITHUB_EVENT_PATH > $RUNNER_TEMP/pr_details.json
           fi
           echo "Hitting the API to get PR Reviews"
           curl "$REPO_API_URL/pulls/$ISSUE_ID/reviews?page=1&limit=1000" > $RUNNER_TEMP/pr_reviews.json
@@ -200,18 +200,18 @@ runs:
         # PR Review Comments: $RUNNER_TEMP/pr_review_comments.json
 
         # Output Variables
-        echo "issue_id=$ISSUE_ID" >> $FORGEJO_OUTPUT
-        echo "issue_type=$ISSUE_TYPE" >> $FORGEJO_OUTPUT
-        echo "branch_name=$BRANCH_NAME" >> $FORGEJO_OUTPUT
+        echo "issue_id=$ISSUE_ID" >> $GITHUB_OUTPUT
+        echo "issue_type=$ISSUE_TYPE" >> $GITHUB_OUTPUT
+        echo "branch_name=$BRANCH_NAME" >> $GITHUB_OUTPUT
 
         echo "::endgroup::"
 
     - name: React to original comment
-      if: forgejo.event_name == 'issue_comment'
+      if: github.event_name == 'issue_comment'
       shell: bash
       run: |
         # Easy when it's a regular comment, otherwise we won't worry about attaching it
-        COMMENT_ID="$(jq -r '.comment.id' $FORGEJO_EVENT_PATH)"
+        COMMENT_ID="$(jq -r '.comment.id' $GITHUB_EVENT_PATH)"
         REPO_API_URL="$(jq -r '.url' $RUNNER_TEMP/repo_details.json)"
         echo "Reacting to original comment"
         curl -X 'POST' "$REPO_API_URL/issues/comments/$COMMENT_ID/reactions" -d '{"content": "eyes"}' > /dev/null
@@ -222,6 +222,7 @@ runs:
         BRANCH_NAME: ${{ steps.get_details.outputs.branch_name }}
       run: |
         echo "::group::Create git details and hooks"
+        git config --global init.defaultBranch main
         git config --global push.autoSetupRemote true
         git config --global user.email "$(jq -r '.email' $RUNNER_TEMP/sender_details.json)"
         git config --global user.name "$(jq -r '.full_name' $RUNNER_TEMP/sender_details.json)"
@@ -261,17 +262,17 @@ runs:
         [ -f "$RUNNER_TEMP/pr_reviews.json" ] && PR_REVIEWS_JSON="$(jq -c '.' "$RUNNER_TEMP/pr_reviews.json")"
         [ -f "$RUNNER_TEMP/pr_review_comments.json" ] && PR_REVIEW_COMMENTS_JSON="$(jq -c '.' "$RUNNER_TEMP/pr_review_comments.json")"
 
-        if [ "$FORGEJO_EVENT_NAME" == "pull_request_review_comment" ]; then
+        if [ "$GITHUB_EVENT_NAME" == "pull_request_review_comment" ]; then
           LATEST_PR_REVIEW_ID="$(jq -c 'first(.[] | select(.stale == false)).id' "$RUNNER_TEMP/pr_reviews.json")"
           TASK_MESSAGE="The user $USERNAME submitted a review ($LATEST_PR_REVIEW_ID) of a Pull Request, ${MENTIONS:+invoking you (with a string from \"$MENTIONS\") to }address the review:"
-        elif [ "$FORGEJO_EVENT_NAME" == "issue_comment" ]; then
-          COMMENT_ID="$(jq -r '.comment.id' "$FORGEJO_EVENT_PATH")"
+        elif [ "$GITHUB_EVENT_NAME" == "issue_comment" ]; then
+          COMMENT_ID="$(jq -r '.comment.id' "$GITHUB_EVENT_PATH")"
           TASK_MESSAGE="The user $USERNAME has sent a comment ($COMMENT_ID), ${MENTIONS:+invoking you (with a string from \"$MENTIONS\") to }address the comment:"
-        elif [ "$FORGEJO_EVENT_NAME" == "issues" ]; then
+        elif [ "$GITHUB_EVENT_NAME" == "issues" ]; then
           TASK_MESSAGE="The user $USERNAME has opened an issue ($ISSUE_NUMBER), ${MENTIONS:+invoking you (with a string from \"$MENTIONS\") to }address the issue:"
         else
           echo "::endgroup::"
-          echo "!!!!!!! Unknown event name: $FORGEJO_EVENT_NAME !!!!!!!"
+          echo "!!!!!!! Unknown event name: $GITHUB_EVENT_NAME !!!!!!!"
           exit 1
         fi
 
@@ -283,7 +284,7 @@ runs:
 
         # This IS supposed to be non-interpreted at this point (single quotes).
         # It DOES get interpreted later (a few lines down), if no user specified prompt is provided.
-        DEFAULT_UNINTERPRETED_PROMPT="$(cat <<'FORGEJO_OUTPUT_EOF_TOKEN'
+        DEFAULT_UNINTERPRETED_PROMPT="$(cat <<'GITHUB_OUTPUT_EOF_TOKEN'
         You are an AI assistant that helps develop and improve code repositories. The git repository in question is in the current directory.
 
         ## Task
@@ -330,7 +331,7 @@ runs:
         * **An Issue Link is Already Created**: A separate comment will already be added to the issue, notifying users of the PR creation and linking to it directly. When a Pull Request is created, only respond with a comment if the response is unrelated to the changes made.
         * **DO NOT switch branches**: The current branch has already been created to hold your changes in case a PR is needed.
         * **DO NOT Submit For A PR**: A Pull Request will automatically be created after you have finished if there are any local commits, do not attempt to create one yourself.}
-        FORGEJO_OUTPUT_EOF_TOKEN
+        GITHUB_OUTPUT_EOF_TOKEN
         )"
 
         # ------------------
@@ -343,9 +344,9 @@ runs:
         echo "Generating opencode prompt"
         [ -z "$UNINTERPRETED_PROMPT" ] && UNINTERPRETED_PROMPT="$DEFAULT_UNINTERPRETED_PROMPT"
 
-        echo "prompt<<FORGEJO_OUTPUT_FINAL_OUTPUT_TOKEN
+        echo "prompt<<GITHUB_OUTPUT_FINAL_OUTPUT_TOKEN
         ${UNINTERPRETED_PROMPT@P}
-        FORGEJO_OUTPUT_FINAL_OUTPUT_TOKEN" >> $FORGEJO_OUTPUT
+        GITHUB_OUTPUT_FINAL_OUTPUT_TOKEN" >> $GITHUB_OUTPUT
         echo "::endgroup::"
       env:
         MENTIONS: ${{ inputs.mentions }}
@@ -362,9 +363,9 @@ runs:
         echo "-----------------------"
         echo "-- Starting opencode --"
         echo "-----------------------"
-        echo "opencode_final_output<<'FORGEJO_OUTPUT_FINAL_OUTPUT_TOKEN'" >> $FORGEJO_OUTPUT
-        opencode run --model "$MODEL" ${AGENT:+--agent "$AGENT"} ${VARIANT:+--variant "$VARIANT"} "$OPENCODE_COMMAND" >> $FORGEJO_OUTPUT
-        echo "'FORGEJO_OUTPUT_FINAL_OUTPUT_TOKEN'" >> $FORGEJO_OUTPUT
+        echo "opencode_final_output<<'GITHUB_OUTPUT_FINAL_OUTPUT_TOKEN'" >> $GITHUB_OUTPUT
+        opencode run --model "$MODEL" ${AGENT:+--agent "$AGENT"} ${VARIANT:+--variant "$VARIANT"} "$OPENCODE_COMMAND" >> $GITHUB_OUTPUT
+        echo "'GITHUB_OUTPUT_FINAL_OUTPUT_TOKEN'" >> $GITHUB_OUTPUT
         echo "-----------------------"
         echo "-- Finished opencode --"
         echo "-----------------------"
@@ -392,7 +393,7 @@ runs:
       run: |
         echo "Adding opencode output as a comment."
         ISSUE_ID="$(jq -r '.number' "$RUNNER_TEMP/issue_details.json")"
-        ISSUE_API_URL="$FORGEJO_API_URL/repos/$FORGEJO_REPOSITORY/issues/$ISSUE_ID"
+        ISSUE_API_URL="$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/issues/$ISSUE_ID"
         COMMENT_JSON="$(jq -cn --arg body "$OPENCODE_FINAL_OUTPUT" '{body: $body}')"
         curl -X 'POST' "$ISSUE_API_URL/comments" -d "$COMMENT_JSON" > /dev/null
 
@@ -418,10 +419,10 @@ runs:
     - name: Authorize upstream git operations
       shell: bash
       run: |
-        GIT_DOMAIN="$(echo "$FORGEJO_SERVER_URL" | awk -F[/:] '{print $4}')"
+        GIT_DOMAIN="$(echo "$GITHUB_SERVER_URL" | awk -F[/:] '{print $4}')"
         SENDER_NAME="$(jq -r '.username' "$RUNNER_TEMP/sender_details.json")"
         # Only doing this AFTER we've finished calling opencode, so it can't push changes on its own
-        echo -e "machine $GIT_DOMAIN\nlogin $SENDER_NAME\npassword $FORGEJO_TOKEN" > ~/.netrc
+        echo -e "machine $GIT_DOMAIN\nlogin $SENDER_NAME\npassword $GITHUB_TOKEN" > ~/.netrc
 
     - name: Check for local commits
       shell: bash
@@ -434,7 +435,7 @@ runs:
         git switch $BRANCH_NAME
         UPSTREAM=$(git rev-parse --abbrev-ref @{u} 2>/dev/null || echo "origin/main")
         LOCAL_COMMITS=$(git rev-list "$UPSTREAM..HEAD" --count)
-        echo "commit_count=$LOCAL_COMMITS" >> $FORGEJO_OUTPUT
+        echo "commit_count=$LOCAL_COMMITS" >> $GITHUB_OUTPUT
         echo "Found $LOCAL_COMMITS local commits"
         echo "::endgroup::"
 
@@ -455,16 +456,16 @@ runs:
         echo "::group::Create a new PR"
         REPO_API_URL="$(jq -r '.url' $RUNNER_TEMP/repo_details.json)"
         ISSUE_ID="$(jq -r '.number' $RUNNER_TEMP/issue_details.json)"
-        ISSUE_API_URL="$FORGEJO_API_URL/repos/$FORGEJO_REPOSITORY/issues/$ISSUE_ID"
+        ISSUE_API_URL="$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/issues/$ISSUE_ID"
         PULL_REQ_TITLE="$(git log main..$BRANCH_NAME --format=%s --reverse -1)"
         PULL_REQ_BODY="$(git log main..$BRANCH_NAME --format=%b --reverse -1)"
         PULL_REQ_JSON="$(jq -cn --arg title "$PULL_REQ_TITLE" --arg body "$PULL_REQ_BODY" --arg head "$BRANCH_NAME" --arg base "main" '{title: $title, body: $body, head: $head, base: $base}')"
-        ACTION_RUN_URL="$FORGEJO_SERVER_URL/$FORGEJO_REPOSITORY/actions/runs/$FORGEJO_RUN_NUMBER"
-        BRANCH_COMMENT_NO_KEY="Created branch [$BRANCH_NAME]($FORGEJO_SERVER_URL/$FORGEJO_REPOSITORY/src/branch/$BRANCH_NAME) with changes via [Action Run]($ACTION_RUN_URL).
-        [Create a PR from this branch]($FORGEJO_SERVER_URL/$FORGEJO_REPOSITORY/compare/main...$BRANCH_NAME)
+        ACTION_RUN_URL="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_NUMBER"
+        BRANCH_COMMENT_NO_KEY="Created branch [$BRANCH_NAME]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/src/branch/$BRANCH_NAME) with changes via [Action Run]($ACTION_RUN_URL).
+        [Create a PR from this branch]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/compare/main...$BRANCH_NAME)
         <sub>Note: Passing a pr-creation-pat with read/write repository access as input allows creating these PRs automagically</sub>"
-        BRANCH_COMMENT_FAILED_KEY="Created branch [$BRANCH_NAME]($FORGEJO_SERVER_URL/$FORGEJO_REPOSITORY/src/branch/$BRANCH_NAME) with changes via [Action Run]($ACTION_RUN_URL).
-        [Create a PR from this branch]($FORGEJO_SERVER_URL/$FORGEJO_REPOSITORY/compare/main...$BRANCH_NAME)
+        BRANCH_COMMENT_FAILED_KEY="Created branch [$BRANCH_NAME]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/src/branch/$BRANCH_NAME) with changes via [Action Run]($ACTION_RUN_URL).
+        [Create a PR from this branch]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/compare/main...$BRANCH_NAME)
         <sub>Note: Using the pr-creation-pat to create a PR failed with "
         
         if [ -z "$PR_CREATION_PAT" ]; then
@@ -497,12 +498,12 @@ runs:
 
     - name: Unreact to comment
       shell: bash
-      if: always() && forgejo.event_name == 'issue_comment'
+      if: always() && github.event_name == 'issue_comment'
       run: |
         # Just in case
         echo "::endgroup::"
         # Easy when it's a regular comment, otherwise won't worry about it
-        COMMENT_ID="$(jq -r '.comment.id' $FORGEJO_EVENT_PATH)"
+        COMMENT_ID="$(jq -r '.comment.id' $GITHUB_EVENT_PATH)"
         REPO_API_URL="$(jq -r '.url' "$RUNNER_TEMP/repo_details.json")"
         echo "Unreacting to original comment"
         curl -X 'DELETE' "$REPO_API_URL/issues/comments/$COMMENT_ID/reactions" -d '{"content": "eyes"}' > /dev/null
