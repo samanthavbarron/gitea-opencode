@@ -323,7 +323,7 @@ runs:
 
         ${NOT_PR:+## Pull Request Creation Guidelines
         * **First Commit Creates the PR**: The first commit summary (first line) and body text (subsequent lines) made will be used to define the title and description of the new pull request, respectively.
-        * **Description is Markdown**: The Pull Request description (subsequent lines in the commit) is interpreted in markdown format.
+        * **Description is Markdown**: The Pull Request description (subsequent lines in the commit) is interpreted in markdown format. Be sure any backticks are escaped properly (so they aren't interpreted by bash) when passing the commit message on the commandline.
         * **DO NOT follow commit message standards**: Since the first commit message is used to create the Pull Request itself, you ABSOLUTELY SHOULD NOT follow existing or standard commit message guidelines. The PR commit message will be squashed when merged by the user in any case.
         * **Detailed Pull Request Descriptions**: Details regarding justification, investigation, changes, decisions made, and other information about changes should be included as part of the Pull Request description, rather than on a seperate comment.
         * **Auto-Closing Original Issues**: Auto-closing the original issue on merge of a PR can be triggerd by including \`fixes #123\` or \`closes #345\` somewhere within the PR description.
