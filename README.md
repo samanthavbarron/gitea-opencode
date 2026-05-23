@@ -1,3 +1,5 @@
+Forked from https://codeberg.org/dragonfyre13/forgejo-opencode
+
 # Overview
 
 This action allows for integration with opencode, similar to [github](https://opencode.ai/docs/github/) actions integration, but without the benefit of custom handling built into opencode itself. With respect to how it functions underneath, it's actually a bit closer to the current [opencode gitlab](https://opencode.ai/docs/gitlab/) integration with respect to using a somewhat raw `opencode run` command wrapped entirely in scripting for environment preparation and teardown.
